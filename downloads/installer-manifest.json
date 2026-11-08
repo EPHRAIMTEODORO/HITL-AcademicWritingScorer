@@ -3,7 +3,7 @@
   "status": "experimental preview",
   "platform": "Windows x64",
   "release_url": "https://github.com/EPHRAIMTEODORO/HITL-AcademicWritingScorer/releases/tag/windows-v0.1.4-preview",
-  "total_download_bytes": 5062200586,
+  "total_download_bytes": 5061973018,
   "payload": {
     "name": "hitl-app.7z",
     "size": 5060953720,
@@ -45,5 +45,14 @@
       "size": 2013,
       "sha256": "0ae7ea5090dbeb5ae01d87a1e12a2c65f991c083abe94b78d9665311e8a085f2"
     }
-  ]
+  ],
+  "zip": {
+    "filename": "installer-files v5.zip",
+    "url": "https://byuh.box.com/s/h0onmdxae1sylpbyujk8z42eb63i1edl",
+    "size": 5061973018,
+    "sha1": "08c97f9b9fbbb3f93f3a0ed38c42c9745628fb52",
+    "sha256": "7d4fedbd0afe9c7ba38c243e56ada33efca50e5b347c693c0dbca5482c4014ca",
+    "setup_executable": "installer-files v5/HITL Academic Writing Scorer Setup 0.1.4.exe"
+  },
+  "assets_note": "The assets array describes the earlier GitHub split-file alternative. The primary download is the complete Box ZIP."
 }
