@@ -40,8 +40,22 @@
       <div class="eyebrow"><span class="tiny-line"></span> A CLOSER LOOK AT THE HITL DESKTOP APP</div>
       <h1 id="page-title">Measure the language.<br>Interpret the writing.<br><em>Keep the human.</em></h1>
       <p class="hero-description">An inside view of a local essay-assessment application: what it measures, what it asks the language model, and how a rater makes the final placement decision.</p>
-      <div class="hero-actions"><a class="button primary" href="#workflow">Explore the workflow <span aria-hidden="true">↓</span></a><a class="text-link" href="#prompts">Read the exact prompts <span aria-hidden="true">↗</span></a></div>
+      <div class="hero-actions"><a class="button primary" href="#workflow">Explore the workflow <span aria-hidden="true">↓</span></a><a class="button secondary" href="#windows-download">Try the Windows preview <span aria-hidden="true">↓</span></a><a class="text-link" href="#prompts">Read the exact prompts <span aria-hidden="true">↗</span></a></div>
       <div class="hero-meta"><span>For linguistic researchers &amp; technical readers</span><span>ESL academic writing · Grades 1–6</span></div>
+      <aside class="download-card" id="windows-download" aria-labelledby="download-title">
+        <span class="preview-badge">EXPERIMENTAL · WINDOWS PREVIEW</span>
+        <h2 id="download-title">Try the desktop app.</h2>
+        <p class="preview-warning"><strong>This app is still in development and is not complete.</strong> Bugs, crashes, and incorrect scores may occur. Use it for experimentation and review all results.</p>
+        <p class="download-meta">Version 0.1.4 · Windows 64-bit · About 5.06 GB to download · Allow at least 25 GB of free disk space</p>
+        <div class="download-actions"><a class="button primary" href="https://github.com/EPHRAIMTEODORO/HITL-AcademicWritingScorer/releases/download/windows-v0.1.4-preview/Download-Windows-Preview.cmd">Download Windows preview <span aria-hidden="true">↓</span></a><a class="text-link" href="https://github.com/EPHRAIMTEODORO/HITL-AcademicWritingScorer/releases/tag/windows-v0.1.4-preview" target="_blank" rel="noopener noreferrer">Release notes &amp; all files <span aria-hidden="true">↗</span></a></div>
+        <p class="download-caption">Downloads a small Windows helper (.cmd). When run, it fetches and verifies the full installer bundle from GitHub. The app is unsigned.</p>
+        <details class="download-instructions"><summary>How to install the preview</summary><ol>
+          <li>Move <code>Download-Windows-Preview.cmd</code> into its own folder, then double-click it while connected to the internet.</li>
+          <li>Leave the window open while it downloads the three large payload parts, reassembles them, and checks their SHA-256 hashes. Existing verified downloads are reused if you run it again.</li>
+          <li>When it says “Ready,” run <code>HITL-Academic-Writing-Scorer-Setup-0.1.4.exe</code> from that folder. Keep <code>7za.exe</code> and <code>hitl-app.7z</code> beside it. Setup replaces an existing installation.</li>
+          <li>Experiment with the app’s Sample action or copies of your workbooks, and check the model’s recommendations yourself.</li>
+        </ol><p>Prefer manual downloads? The release page includes all files and the preparation script. Download the installer, <code>7za.exe</code>, all three payload parts, and both helper files into one folder, then run the download helper. It verifies and joins the local files without downloading them again. <a href="downloads/installer-manifest.json" download>Download checksums and file sizes</a>.</p></details>
+      </aside>
       <div class="approach-strip">
         <div><span class="step-tag">MEASURE</span><h2>Observable evidence</h2><p>Lexical, syntactic, cohesion, and grammar-related measurements from Python.</p></div>
         <div><span class="step-tag">INTERPRET</span><h2>Rubric judgments</h2><p>Local Llama 3 assesses seven traits, then generates a placement recommendation.</p></div>

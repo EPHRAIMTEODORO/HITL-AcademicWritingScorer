@@ -22,6 +22,16 @@ python -m http.server 8080 --bind 127.0.0.1 --directory "C:\path\to\HITL AES"
 
 Replace the example path with this folder's location. The static site can be moved or renamed independently of the desktop app repository.
 
+## Experimental Windows download
+
+The website links to the [Windows 0.1.4 experimental prerelease](https://github.com/EPHRAIMTEODORO/HITL-AcademicWritingScorer/releases/tag/windows-v0.1.4-preview). The app is unfinished: bugs, crashes, and incorrect scores may occur. It is provided for experimentation, with human review of all results.
+
+Download `Download-Windows-Preview.cmd` from the release, move it into its own folder, and double-click it. It fetches the versioned PowerShell preparation script, verifies its SHA-256 hash, and downloads about 5.06 GB of installer assets. Allow at least 25 GB of free disk space for downloads, assembly, installation, and the app's model storage. The helper verifies and reassembles the three payload parts, then tells the user to run `HITL-Academic-Writing-Scorer-Setup-0.1.4.exe`. It does not install or launch the app automatically. Setup replaces an existing installation. The build is unsigned.
+
+The helpers in `downloads/` prepare the existing installer without changing the desktop app. `downloads/installer-manifest.json` records the original payload hash and release-asset sizes and hashes. For manual preparation, keep both helpers, all three payload parts, `7za.exe`, and the Setup executable together; running the download helper reuses verified local files.
+
+Large installer assets live in GitHub Releases, outside the static website and Git history. Links are pinned to this experimental version. To distribute a new build, publish its assets and update the helper hashes, manifest, release URLs, version, and download size together. Keep the unfinished-software notice beside the download. Refreshing reference prompts does not update this separate download configuration.
+
 ## GitHub Pages
 
 All website files live in this folder. Asset links are relative, so the site works at a GitHub Pages project subpath as well as the domain root.

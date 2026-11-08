@@ -1,0 +1,3 @@
+# Preserve the preparation script's bytes for its pinned download checksum.
+downloads/*.ps1 text eol=lf
+downloads/*.cmd text eol=crlf
