@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A source-grounded guide to the HITL Academic Writing Scorer desktop app: linguistic evidence, exact prompts, local architecture, and human assessment decisions.">
+  <meta name="theme-color" content="#183e36">
+  <title>HITL AES · Inside the desktop assessor</title>
+  <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="assets/styles.css">
+  <script src="assets/site.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="reading-progress" aria-hidden="true"><div id="reading-progress"></div></div>
+  <header class="mobile-header"><a class="wordmark" href="#overview">H<span class="brand-dot">·</span>A <span>HITL AES</span></a><button id="menu-toggle" type="button" aria-expanded="false" aria-controls="sidebar">Contents <span aria-hidden="true">☰</span></button></header>
+  <aside class="sidebar" id="sidebar" aria-label="Guide navigation">
+    <a class="wordmark" href="#overview" aria-label="HITL AES, overview">H<span class="brand-dot">·</span>A</a>
+    <div class="sidebar-title">Human-in-the-loop<br>Academic Writing Scorer</div>
+    <p class="sidebar-caption">DESKTOP APP / FIELD GUIDE</p>
+    <nav aria-label="Table of contents">
+      <a href="#overview" class="active"><span>01</span> The approach</a>
+      <a href="#workflow"><span>02</span> From essay to decision</a>
+      <a href="#architecture"><span>03</span> Inside the application</a>
+      <a href="#linguistic-evidence"><span>04</span> Linguistic evidence</a>
+      <a href="#rubric"><span>05</span> Rubric &amp; interpretation</a>
+      <a href="#prompts"><span>06</span> Exact prompt library</a>
+      <a href="#inference"><span>07</span> Model request &amp; output</a>
+      <a href="#human-review"><span>08</span> The human decision</a>
+      <a href="#data-contract"><span>09</span> Workbooks &amp; API</a>
+      <a href="#runtime"><span>10</span> Local runtime</a>
+      <a href="#limitations"><span>11</span> Interpretation &amp; limits</a>
+      <a href="#sources"><span>12</span> Sources &amp; provenance</a>
+    </nav>
+    <div class="sidebar-bottom"><span class="status-dot"></span> Source-grounded reference<br><small>Desktop <span data-source-version>0.1.4</span> · reviewed Nov 6, 2026</small><a href="assets/prompts.txt" download>Download all prompts <span aria-hidden="true">↗</span></a></div>
+  </aside>
+
+  <main id="main">
+    <section class="hero observed-section" id="overview" aria-labelledby="page-title">
+      <div class="eyebrow"><span class="tiny-line"></span> A CLOSER LOOK AT THE HITL DESKTOP APP</div>
+      <h1 id="page-title">Measure the language.<br>Interpret the writing.<br><em>Keep the human.</em></h1>
+      <p class="hero-description">An inside view of a local essay-assessment application: what it measures, what it asks the language model, and how a rater makes the final placement decision.</p>
+      <div class="hero-actions"><a class="button primary" href="#workflow">Explore the workflow <span aria-hidden="true">↓</span></a><a class="text-link" href="#prompts">Read the exact prompts <span aria-hidden="true">↗</span></a></div>
+      <div class="hero-meta"><span>For linguistic researchers &amp; technical readers</span><span>ESL academic writing · Grades 1–6</span></div>
+      <div class="approach-strip">
+        <div><span class="step-tag">MEASURE</span><h2>Observable evidence</h2><p>Lexical, syntactic, cohesion, and grammar-related measurements from Python.</p></div>
+        <div><span class="step-tag">INTERPRET</span><h2>Rubric judgments</h2><p>Local Llama 3 assesses seven traits, then generates a placement recommendation.</p></div>
+        <div><span class="step-tag">DECIDE</span><h2>Human responsibility</h2><p>The rater reads the essay and evidence, then accepts or overrides the recommendation.</p></div>
+      </div>
+      <aside class="callout"><strong>What “hybrid” means here</strong><p>The desktop brings rule-based evidence and LLM judgments together for review. Its <b>Model Score is <code>llm_recommended_score</code></b>. The manual 0–100 AES score is separate; there is no learned fusion or arithmetic average producing the desktop grade.</p></aside>
+      <p class="source-note">Scope: the Electron desktop application, its Python backend, and the shared extractor it imports. Separate batch, Colab, research-fusion, and React prototype workflows are outside this guide.</p>
+    </section>
+
+    <section class="observed-section" id="workflow" aria-labelledby="workflow-title">
+      <div class="section-label">02 / THE WORKFLOW</div><h2 id="workflow-title">An essay becomes evidence.<br>A rater makes it a decision.</h2>
+      <p class="section-intro">The interface has two stages: process a raw workbook, then load a completed workbook for essay-by-essay review. Loading a completed workbook does not call the model again.</p>
+      <ol class="timeline">
+        <li><div><h3>Upload &amp; map the workbook</h3><p>Choose an <code>.xlsx</code> file and identify the ID, topic, and essay columns. Defaults are <code>Student ID</code>, <code>Topic</code>, and <code>Essay</code>. The packaged sample uses <code>id</code>; the Sample action maps it and processes one essay.</p></div></li>
+        <li><div><h3>Normalize &amp; measure</h3><p>The processor reads the selected sheet, ignores blank headers and wholly empty rows, and cleans known spacing artifacts. It preserves the student's grammar. Python extracts the linguistic features and counts visible paragraphs.</p></div></li>
+        <li><div><h3>Ask the local rubric assessor</h3><p>The model receives a system instruction, the six-level rubric, full Level 4/5/6 anchors, and the target essay with its ID, topic, and paragraph count. MTLD, AWL, grammar density, and the manual AES score are calculated alongside it and are <b>not included in the model prompt</b>.</p></div></li>
+        <li><div><h3>Write the completed workbook</h3><p>Each essay receives measured features, rubric scores, and a justification. After the entire workbook succeeds, the application writes <code>Completed_Scores</code>. Every new human decision is <b>Pending</b>, with no final human grade.</p></div></li>
+        <li><div><h3>Review, accept or override, and save</h3><p>Load the completed workbook, inspect the full essay and supporting evidence, and select a whole-number grade from 1 to 6. Saving updates the records and rewrites the output workbook with a derived placement and timestamp.</p></div></li>
+      </ol>
+      <div class="inline-note"><b>Input detail that matters:</b> preserve blank lines between paragraphs inside each essay cell. Paragraph quantity comes from visible blank-line-separated blocks, rather than a discourse-segmentation model.</div>
+      <p class="source-note">Implementation: <code>hitl_processor.py</code> → <code>hybrid_llm_aes.evaluate_row()</code> → <code>app_backend.update_job_decision()</code>. <a href="#sources">Source register ↗</a></p>
+    </section>
+
+    <section class="observed-section" id="architecture" aria-labelledby="architecture-title">
+      <div class="section-label">03 / ARCHITECTURE &amp; COMPONENTS</div><h2 id="architecture-title">A desktop window.<br>A local assessment pipeline.</h2>
+      <p class="section-intro">Electron manages the window and process lifecycle. Python handles workbook jobs and scoring. The model and grammar engine run as local services or processes.</p>
+      <figure class="architecture-figure"><div class="architecture">
+        <div class="arch-top"><span class="step-tag">DESKTOP SHELL</span><strong>Electron + local HTML / CSS / JavaScript</strong><span>Upload · readiness · essay review · human decision</span></div>
+        <div class="connector" aria-hidden="true">↕ <span>HTTP over loopback</span></div>
+        <div class="arch-api"><span class="step-tag">PYTHON BACKEND</span><strong>HTTP bridge → job registry → workbook processor</strong><span>Background jobs · sequential essay processing · progress &amp; persistence</span></div>
+        <div class="arch-branches">
+          <div><span class="step-tag">MEASUREMENT BRANCH</span><h3>Linguistic extractor</h3><p>spaCy · wordfreq · lexical-diversity<br>NLTK · AWL word forms</p><div class="arch-sub">LanguageTool + Java<br><small>Grammar-related rule matches</small></div></div>
+          <div><span class="step-tag">INTERPRETATION BRANCH</span><h3>Prompted rubric assessor</h3><p>System + rubric + three anchors<br>Essay + limited metadata</p><div class="arch-sub">Ollama → Llama 3 8B<br><small>Traits · recommendation · justification</small></div></div>
+        </div>
+        <div class="connector" aria-hidden="true">↓ <span>Evidence and judgments are merged into rows</span></div>
+        <div class="arch-final"><strong>Completed workbook → human review → saved final placement</strong><span>openpyxl writes the generated workbook and later human decisions</span></div>
+      </div><figcaption>Conceptual data flow reconstructed from the desktop source. The two branches are complementary responsibilities; essay processing invokes them sequentially.</figcaption></figure>
+      <div class="table-wrap"><table><caption>Runtime and packaging responsibilities</caption><thead><tr><th scope="col">Component</th><th scope="col">Responsibility in the desktop</th><th scope="col">Source / dependency</th></tr></thead><tbody>
+        <tr><th scope="row">Electron + Node.js</th><td>Choose local ports, prepare model storage, launch the backend, open the window, collect logs, and request shutdown.</td><td><code>desktop/main.cjs</code><br>Electron <code>^32.3.3</code></td></tr>
+        <tr><th scope="row">Vanilla web interface</th><td>Workbook upload, progress polling, essay navigation, evidence display, mismatch alerts, and decision saving.</td><td><code>HITL/ui/index.html</code></td></tr>
+        <tr><th scope="row">Python HTTP + threads</th><td>Local routes and a locked in-memory job registry. A background thread runs each scoring job.</td><td><code>local_api_server.py</code><br><code>app_backend.py</code></td></tr>
+        <tr><th scope="row">spaCy + English model</th><td>Alphabetic tokens, sentences, POS tags, and dependencies for lexical and syntactic measurements.</td><td><code>en_core_web_sm</code></td></tr>
+        <tr><th scope="row">Lexical resources</th><td>Zipf frequency, MTLD, AWL token matches, and sentence splitting for lexical overlap.</td><td><code>wordfreq</code> · <code>lexical-diversity</code> · NLTK · AWL JSON</td></tr>
+        <tr><th scope="row">LanguageTool + Java</th><td>Local rule-match density. If checking fails, grammar evidence is unavailable.</td><td><code>language-tool-python</code> + bundled JRE</td></tr>
+        <tr><th scope="row">Ollama + Llama 3</th><td>Serve local inference and generate the seven rubric traits, overall recommendation, and justification.</td><td>Default model: <code>llama3:8b</code></td></tr>
+        <tr><th scope="row">openpyxl</th><td>Read input workbooks and write generated scores and human decision fields.</td><td><code>hitl_processor.py</code></td></tr>
+        <tr><th scope="row">PyInstaller + electron-builder</th><td>Freeze the Python sidecar and package native desktop resources. Windows handoff also uses a C# setup helper and 7-Zip inputs.</td><td><code>build-python-sidecar.cjs</code><br><code>build-windows-installer.ps1</code></td></tr>
+      </tbody></table></div>
+      <p class="source-note">Electron dependency ranges come from <code>desktop/package.json</code>; they are not a claim about the exact installed binary. The preload bridge exposes platform information.</p>
+    </section>
+
+    <section class="observed-section" id="linguistic-evidence" aria-labelledby="features-title">
+      <div class="section-label">04 / LINGUISTIC EVIDENCE</div><h2 id="features-title">What the code can count.<br>What the count cannot establish.</h2>
+      <p class="section-intro">The shared extractor supplies twelve core features. HITL adds paragraph count, type–token ratio, and average word length. These are observable proxies that require interpretation in context.</p>
+      <div class="filter-bar"><label for="feature-search">Find a feature</label><input id="feature-search" type="search" placeholder="Try “grammar”, “lexical”, or “syntax”…" autocomplete="off" aria-controls="feature-table"><span id="feature-count" role="status">15 features</span></div>
+      <div class="table-wrap"><table id="feature-table"><caption class="sr-only">Feature definitions, computations, and interpretation limits</caption><thead><tr><th scope="col">Feature</th><th scope="col">Computation</th><th scope="col">Interpretation &amp; limits</th></tr></thead><tbody>
+        <tr data-feature><th scope="row"><code>word_count</code><small>Production</small></th><td>Count of spaCy tokens with <code>is_alpha</code>.</td><td>Alphabetic tokens; may differ from Word or whitespace counts. Length does not establish quality.</td></tr>
+        <tr data-feature><th scope="row"><code>sentence_count</code><small>Production</small></th><td>Count of nonempty spaCy sentences; nonempty fallback is 1.</td><td>Sentence segmentation can be affected by learner punctuation.</td></tr>
+        <tr data-feature><th scope="row"><code>mean_sentence_length</code><small>Syntax / length</small></th><td>Alphabetic word count ÷ sentence count.</td><td>Long sentences can reflect elaboration, run-ons, or segmentation errors.</td></tr>
+        <tr data-feature><th scope="row"><code>avg_word_freq</code><small>Lexical frequency</small></th><td>Mean English <code>zipf_frequency</code> over lowercase alphabetic tokens.</td><td>Lower means rarer vocabulary; rarity does not establish appropriate usage.</td></tr>
+        <tr data-feature><th scope="row"><code>mtld</code><small>Lexical diversity</small></th><td><code>lexical_diversity.lex_div.mtld(words)</code>; returns 0 for fewer than two words or an exception.</td><td>Measures lexical variety. A zero may also indicate a guarded calculation failure.</td></tr>
+        <tr data-feature><th scope="row"><code>awl_ratio</code><small>Academic vocabulary</small></th><td>AWL-matching word tokens ÷ alphabetic word tokens.</td><td>A proportion, not a count of unique academic word families. Missing JSON uses a smaller fallback set.</td></tr>
+        <tr data-feature><th scope="row"><code>clause_density</code><small>Syntax</small></th><td>Tokens labeled <code>ccomp</code>, <code>xcomp</code>, or <code>advcl</code> ÷ alphabetic words.</td><td>A restricted dependency-based clause proxy, not all clauses in an essay.</td></tr>
+        <tr data-feature><th scope="row"><code>dependency_depth</code><small>Syntax</small></th><td>Mean hops to the sentence root across non-space tokens.</td><td>A parse-tree structural measure; dependent on parser behavior on learner writing.</td></tr>
+        <tr data-feature><th scope="row"><code>noun_complexity</code><small>Syntax</small></th><td>Mean number of direct syntactic children of tokens tagged <code>NOUN</code>.</td><td>A noun modification proxy, not full noun-phrase sophistication.</td></tr>
+        <tr data-feature><th scope="row"><code>connective_density</code><small>Cohesion</small></th><td>Regex matches from a fixed connective list × 100 ÷ words.</td><td>Presence does not establish correct discourse relations or rhetorical coherence.</td></tr>
+        <tr data-feature><th scope="row"><code>lexical_overlap</code><small>Cohesion</small></th><td>Mean adjacent-sentence Jaccard similarity: <code>|A ∩ B| / |A ∪ B|</code>.</td><td>Lowercase word sets include function words. Repetition and cohesion can look similar; no embeddings are used.</td></tr>
+        <tr data-feature><th scope="row"><code>grammar_errors_per_100</code><small>Grammar-related evidence</small></th><td>LanguageTool match count × 100 ÷ alphabetic words.</td><td>Tool matches are not a verified inventory of errors. A failed check is missing evidence, rather than zero errors.</td></tr>
+        <tr data-feature><th scope="row"><code>paragraph_count</code><small>Added by HITL</small></th><td>Nonempty blocks separated by blank lines after normalization.</td><td>Formatting-sensitive paragraph quantity; not a judgment of paragraph development.</td></tr>
+        <tr data-feature><th scope="row"><code>type_token_ratio</code><small>Added by HITL · lexical diversity</small></th><td>Unique lowercase regex words ÷ all regex words, using <code>\b[a-zA-Z]+\b</code>.</td><td>Sensitive to text length. This tokenizer can differ from spaCy, particularly on contractions.</td></tr>
+        <tr data-feature><th scope="row"><code>avg_word_length</code><small>Added by HITL · lexical length</small></th><td>Total characters in regex words ÷ regex word count.</td><td>Orthographic length is not semantic or academic sophistication.</td></tr>
+      </tbody></table><p id="feature-empty" hidden>No features match. Try a broader term.</p></div>
+      <details class="reference-detail"><summary>The separate manual AES score: formula and worked example</summary><div class="detail-content">
+        <p>Only four of the measurements enter <code>aes_score</code>. The normalization bounds and weights are hand-chosen.</p>
+        <div class="table-wrap"><table><caption>Manual 0–100 heuristic</caption><thead><tr><th>Component</th><th>Normalization interval</th><th>Direction receiving credit</th><th>Weight</th></tr></thead><tbody>
+          <tr><td>MTLD</td><td>20–100</td><td>Higher</td><td>0.25</td></tr><tr><td>AWL ratio</td><td>0–0.20</td><td>Higher</td><td>0.30</td></tr><tr><td>Mean Zipf frequency</td><td>2–6</td><td>Lower</td><td>0.20</td></tr><tr><td>Grammar matches / 100</td><td>0–20</td><td>Lower</td><td>0.25</td></tr>
+        </tbody></table></div>
+        <pre class="code-block" tabindex="0">N(x) = clip((x − minimum) / (maximum − minimum), 0, 1)
+For lower-is-better components: use 1 − N(x)
+
+aes_score = 100 × Σ(weight × normalized value)
+                  / Σ(weights of available components)</pre>
+        <p>For MTLD = 60, AWL = 0.10, Zipf = 4, and grammar density = 4, the normalized components are 0.50, 0.50, 0.50, and 0.80. The score is <b>57.5 / 100</b>. Missing grammar is excluded and the available weights are renormalized. This value does not become the desktop’s Model Score or final human grade.</p>
+      </div></details>
+      <p class="source-note">Source: <code>aes_feature_extractor.py</code>, plus <code>extract_hitl_lexical_features()</code> and <code>paragraph_count()</code> in <code>HITL/hybrid_llm_aes.py</code>. Output feature names use the <code>aes_</code> prefix.</p>
+    </section>
+
+    <section class="observed-section" id="rubric" aria-labelledby="rubric-title">
+      <div class="section-label">05 / RUBRIC &amp; INTERPRETATION</div><h2 id="rubric-title">Seven judgments about writing.<br>One generated recommendation.</h2>
+      <p class="section-intro">Each analytic trait uses an integer from 1 to 6, with higher values indicating stronger performance. The overall recommendation is generated separately: the application does not calculate it as a weighted average of traits.</p>
+      <div class="trait-list">
+        <article><span>01</span><div><h3>Organization</h3><p>Are ideas logically arranged and coherently connected?</p></div><code>organization</code></article>
+        <article><span>02</span><div><h3>Paragraph development</h3><p>Are the paragraphs substantively developed, beyond merely existing?</p></div><code>paragraph_development</code></article>
+        <article><span>03</span><div><h3>Supporting detail</h3><p>Are there adequate concrete reasons, examples, and support?</p></div><code>supporting_detail</code></article>
+        <article><span>04</span><div><h3>Abstract elaboration</h3><p>Does the writer move from concrete detail toward explanation, reasoning, or reflection?</p></div><code>abstract_elaboration</code></article>
+        <article><span>05</span><div><h3>Prompt control</h3><p>Does the response stay relevant to the supplied writing task?</p></div><code>prompt_control</code></article>
+        <article><span>06</span><div><h3>Comprehensibility</h3><p>How readily could a native reader unfamiliar with learner writing understand the essay?</p></div><code>comprehensibility</code></article>
+        <article><span>07</span><div><h3>Grammar meaning impact</h3><p>Do grammar and vocabulary problems interfere with communication? Higher scores mean stronger control of meaning.</p></div><code>grammar_meaning_impact</code></article>
+      </div>
+      <div class="inline-note"><b>Two kinds of grammar evidence:</b> LanguageTool counts surface rule matches. The LLM judges their consequences for meaning. The prompt explicitly tells the model not to penalize grammar twice.</div>
+      <h3 class="subheading">The six levels encoded in the prompt</h3><p>The following is a reading aid. The <a href="#prompt-user_prompt_template">exact wording is in the prompt library</a>. These are repository descriptors, not an independent verification of institutional placement policy.</p>
+      <div class="rubric-levels">
+        <article><span class="level-number">6</span><div><h4>Clearly organized &amp; fully developed</h4><p>Accurate cohesive devices; 4+ paragraphs; developed concrete support and some abstract elaboration; strong grammar control with infrequent errors; easily understood by unfamiliar native readers.</p></div></article>
+        <article><span class="level-number">5</span><div><h4>Clear organization &amp; concrete support</h4><p>Some accurate cohesive devices; 4 paragraphs; concrete supporting detail; moderate vocabulary and grammar control; errors do not block meaning; understandable with some effort.</p></div></article>
+        <article><span class="level-number">4</span><div><h4>Partially organized &amp; generally understandable</h4><p>Limited or inconsistent cohesion; 2–3 paragraphs; personal and sometimes concrete detail; errors may distort meaning, though the essay is generally understandable.</p></div></article>
+        <article><span class="level-number">3</span><div><h4>Weak organization &amp; limited development</h4><p>Listed or loosely connected ideas; 1–2 paragraphs, or underdeveloped paragraphs; limited, repetitive, or general support; frequent errors may distort meaning; understandable only with effort.</p></div></article>
+        <article><span class="level-number">2</span><div><h4>Minimal organization &amp; little relevant support</h4><p>Very limited development; ideas difficult to follow; frequent errors often block meaning; difficult for unfamiliar native readers to understand.</p></div></article>
+        <article><span class="level-number">1</span><div><h4>Very limited response &amp; mostly unclear meaning</h4><p>Fragmentary, memorized, mostly off-topic, or very limited writing; little or no development; insufficient control for Level 2.</p></div></article>
+      </div>
+      <p>Paragraph descriptors guide the model; there are no hard-coded paragraph gates that force a grade. The prompt requires clear Level 4 evidence for grades ≥4, and clearly adequate organization, development, support, and comprehensibility for grades ≥5.</p>
+      <p class="source-note">Source: <code>HITL/llm_rubric_prompt.py</code>. The review panel displays five trait aliases; abstract elaboration and grammar meaning impact remain in the output columns.</p>
+    </section>
+
+    <section class="observed-section" id="prompts" aria-labelledby="prompts-title">
+      <div class="section-label">06 / EXACT PROMPT LIBRARY</div><h2 id="prompts-title">Read what the model<br>actually receives.</h2>
+      <p class="section-intro">The text below is extracted directly from the desktop prompt definitions. It includes the complete system instruction, user template, and all three calibration essays, without editorial rewriting.</p>
+      <div class="prompt-map" aria-label="Prompt assembly"><span>System instruction</span><b aria-hidden="true">+</b><span>Rubric &amp; 4 / 5 / 6 anchors</span><b aria-hidden="true">+</b><span>Metadata &amp; target essay</span><b aria-hidden="true">→</b><span class="prompt-result">JSON assessment</span></div>
+      <p><code>build_user_prompt()</code> substitutes all three full anchors, <code>essay_id</code>, <code>prompt_id</code>, <code>paragraph_count</code>, and <code>essay_text</code>. An empty topic becomes <code>Not provided</code>. The target essay is appended after the anchors.</p>
+      <div class="section-actions"><a class="button secondary" href="assets/prompts.txt" download>Download exact prompt text <span aria-hidden="true">↓</span></a><button class="text-button" type="button" id="expand-prompts" aria-expanded="false">Expand all prompts</button></div>
+      <!-- EXACT_PROMPTS_START -->
+<details class="prompt-block" id="prompt-system_prompt">
+<summary><span>System instruction</span><span class="mono prompt-kind">SYSTEM_PROMPT</span></summary>
+<div class="prompt-body"><p>Sets the assessor role, conservative scoring policy, and JSON-only response.</p>
+<div class="prompt-toolbar"><span class="source-label">llm_rubric_prompt.py · lines 6–6</span><button type="button" class="copy-button" data-copy="text-system_prompt">Copy text</button></div>
+<pre id="text-system_prompt" tabindex="0">You are an ESL writing assessor. Score only the rubric traits requested. Be consistent, conservative, and evidence-based. Do not invent details that are not supported by the essay. If a criterion is unclear, give the lower score unless the essay clearly meets the higher level. Return valid JSON only.</pre></div></details>
+<details class="prompt-block" id="prompt-user_prompt_template">
+<summary><span>User prompt template</span><span class="mono prompt-kind">USER_PROMPT_TEMPLATE</span></summary>
+<div class="prompt-body"><p>Contains the complete six-level rubric, task, safeguards, required JSON keys, and substitution fields. The three anchor placeholders are expanded before inference.</p>
+<div class="prompt-toolbar"><span class="source-label">llm_rubric_prompt.py · lines 38–135</span><button type="button" class="copy-button" data-copy="text-user_prompt_template">Copy text</button></div>
+<pre id="text-user_prompt_template" tabindex="0">You are scoring a student ESL essay for placement.
+
+Use this rubric:
+
+Level 6:
+- Clearly organized with cohesive devices used accurately
+- Fully developed essay with 4 or more paragraphs
+- Developed, concrete supporting detail, with some abstract elaboration
+- Strong grammar control; only infrequent errors
+- Easily understood by native readers unfamiliar with learner writing
+
+Level 5:
+- Clearly organized with some accurate cohesive devices
+- 4 paragraphs
+- Concrete supporting detail
+- Moderate vocabulary and grammar control; errors do not block meaning
+- Understandable with some effort
+
+Level 4:
+- Partially organized; cohesion is limited or inconsistent
+- 2-3 paragraphs
+- Personal and sometimes concrete detail
+- Errors may distort meaning, though the essay is generally understandable
+
+Level 3:
+- Weak organization; ideas may be listed or loosely connected
+- 1-2 paragraphs, or paragraphs are present but underdeveloped
+- Limited, repetitive, or mostly general supporting detail
+- Frequent grammar and vocabulary errors may distort meaning
+- Understandable only with effort
+
+Level 2:
+- Minimal organization; ideas are difficult to follow
+- Very limited development
+- Little relevant support
+- Frequent errors often block meaning
+- Difficult for native readers unfamiliar with learner writing to understand
+
+Level 1:
+- Very limited, fragmentary, memorized, or mostly off-topic response
+- Little or no development
+- Meaning is mostly unclear
+- Does not show enough control for Level 2
+
+Use these anchor essays as calibration examples:
+
+Level 6 anchor:
+{level_6_anchor}
+
+Level 5 anchor:
+{level_5_anchor}
+
+Level 4 anchor:
+{level_4_anchor}
+
+Task:
+1. Score each LLM-handled criterion separately.
+2. Give one LLM recommended score.
+3. Briefly explain the evidence from the essay.
+
+Important:
+- Use the anchor essays to calibrate the score. Compare the target essay&#x27;s organization, development, detail, control, and comprehensibility against the anchors.
+- Do not copy language from the anchor essays into the justification.
+- Do not reward an essay only because it has the same topic as an anchor.
+- Use paragraph_count from metadata for paragraph quantity.
+- Judge paragraph_development based on whether the paragraphs are developed, not only whether they exist.
+- Do not reward length alone.
+- Do not assign Level 4 or higher unless the essay clearly meets the Level 4 descriptors.
+- Do not assign Level 5 or higher unless organization, development, support, and comprehensibility are all clearly at that level.
+- Do not penalize grammar twice: grammar_meaning_impact should measure whether errors interfere with meaning, not the number of errors.
+- The final hybrid model will use separate rule-based grammar features.
+- Do not quote long passages.
+- Return valid JSON only.
+
+Scoring scale:
+- Trait scores must be integers from 1 to 6.
+- llm_recommended_score must be a whole-number grade from 1 to 6.
+
+Required JSON keys:
+- essay_id
+- organization
+- paragraph_development
+- supporting_detail
+- abstract_elaboration
+- prompt_control
+- comprehensibility
+- grammar_meaning_impact
+- llm_recommended_score
+- justification
+
+Essay metadata:
+- Essay ID: {essay_id}
+- Essay prompt/topic: {prompt_id}
+- Paragraph count: {paragraph_count}
+
+Essay:
+{essay_text}
+</pre></div></details>
+<details class="prompt-block" id="prompt-level_4_anchor">
+<summary><span>Level 4 calibration essay</span><span class="mono prompt-kind">LEVEL_4_ANCHOR</span></summary>
+<div class="prompt-body"><p>Full anchor supplied to the model, preserved exactly as written in the source.</p>
+<div class="prompt-toolbar"><span class="source-label">llm_rubric_prompt.py · lines 31–35</span><button type="button" class="copy-button" data-copy="text-level_4_anchor">Copy text</button></div>
+<pre id="text-level_4_anchor" tabindex="0">Each of us has a agency and we have freedom to choose, that&#x27;s why I truly understand that some students may choose to live in universities dormitories and some may choose to live in apartments in the community. In my case, I would choose living in university dormitories, because there are some things that can be control and you will be protected from any dangers and temptations. For me living inside the campus can offer some unique benefits that will help you focus on your studies.
+
+There are some particular reasons why I&#x27;ve chosen this because you are close to all school facilities and that makes convenient, making easy to attend classes, access resources , and participate in school activities. Living on campus can provide a structured environment prior to studying, with easy access to libraries and quiet study areas. You may find peace and you can focus more on your task and activities , this also can help you more prepared in any test or exams you have because you can study peacefully. A school like BYU- HAWAII is a great example because if you choose to live inside their campus , they assure your safety and can protect you from temptations through having spiritual activities that can guide you to a righteous path. BYU- HAWAII truly can help you focus on your covenant path while studying.
+
+Lastly, living in university dormitories, can provide you a sense of safety and a peace of mind. It will protect you against dangers outside the school, and can help you prioritize more your studies that can help you become successful in your career.</pre></div></details>
+<details class="prompt-block" id="prompt-level_5_anchor">
+<summary><span>Level 5 calibration essay</span><span class="mono prompt-kind">LEVEL_5_ANCHOR</span></summary>
+<div class="prompt-body"><p>Full anchor supplied to the model, preserved exactly as written in the source.</p>
+<div class="prompt-toolbar"><span class="source-label">llm_rubric_prompt.py · lines 22–28</span><button type="button" class="copy-button" data-copy="text-level_5_anchor">Copy text</button></div>
+<pre id="text-level_5_anchor" tabindex="0">It has been very common for student to live out of their house when studying in a university, most specially when the University is away from home. I have never experienced living inside a university dormitory, but I have already tried living in a apartment when I was still serving a mission. According to my friends who stays in a university apartment, it can be fun sometimes, as long as you get along with those people you stay with the dormitory, and you can gain friends from other departments also. But on the other side, it can sometimes be hassle if you want space and a time for yourself to study, and there will be more people that you will be living with than living in a apartment where you can choose to be alone or have just few people that you know to live with you. Living in a apartment is nice if you want to have a more private life and a more peaceful surrounding. And it is a different experience from living in a university dormitory.
+
+For me, I would prefer to live in an apartment in the community. Connected to what I said in the first paragraph, having your own apartment can create freedom and privacy for me. As to freedom, I do like to make my own rules inside the house, for example, I don&#x27;t like to stay in a room or house that is messy, I do like to clean a lot, and it bothers me a lot if the house is dirty. Also, I can invite whoever I want, either friends or family. For privacy, as much I want to be around by a lot of people, I love to have my own personal time. There will be times that I need to be alone, most specially when I am studying, I don&#x27;t want anything that can really disturb my study time, and also, I have time to ponder and meditate on important things that I need to prioritize. Freedom and privacy gives me the peace to where I live.
+
+Since growing up in my parents house, I did not have much of the privacy that I needed, since I have my siblings with me, they would just barge my room anytime they want, or they just enter my room and take my own things without my permission. And I am that kind of person who loves her personal time and someone whom you need to ask permission with things you want to borrow or take. I live to have a peaceful mind and to stay connected with the Lord, so having my own apartment will give me the ease that I need. This also gives me the idea of having the feeling of being at home, since I can make it my own home, than having to share a room with people I just met. I love being around people, but trusting people immediately is not really my thing. Therefore, living on my own in a apartment will be easier for me, and in there I can just bring friends without any restrictions to follow, since university dormitories have rules and regulations where I know I am not at best in following, most specially when being out late with friends and I am not good at keeping time.
+
+Upon with choosing which to live in, being in a university dormitory is really not bad, since it can create friendship with other people. But for me, living in a apartment will give me the feeling of being at ease and safe. Since I have already experienced living in a apartment when I served a mission, it gives me more of the idea what it feels to live in a apartment, can be somewhat being in a university dormitory, since I was able to live with 2 to 4 people in a apartment. With regards to that, I am more contented in having my own apartment and don&#x27;t have too much to worry with my own privacy and peace in living outside of my parent&#x27;s house. And there, I can be comfortable as much as I want, be myself often, not fearing of what other people might say to me or the actions I will do. Choosing to live in an apartment is for my own comfort and convenience.</pre></div></details>
+<details class="prompt-block" id="prompt-level_6_anchor">
+<summary><span>Level 6 calibration essay</span><span class="mono prompt-kind">LEVEL_6_ANCHOR</span></summary>
+<div class="prompt-body"><p>Full anchor supplied to the model, preserved exactly as written in the source.</p>
+<div class="prompt-toolbar"><span class="source-label">llm_rubric_prompt.py · lines 9–19</span><button type="button" class="copy-button" data-copy="text-level_6_anchor">Copy text</button></div>
+<pre id="text-level_6_anchor" tabindex="0">Distance, expense, comfort, structure, security, accessibility, and people are some of the things most students consider when choosing a place to live while studying. For instance, I debated with my mom a lot about living arrangements when I was in high school because I want to live at the dorm and while she wants me to stay at home. Now that I will be a college student, I prefer living in apartments in the community so that I can be independent in all aspects of my life.
+
+Having an apartment, provides opportunities to accumulate knowledge based on experience. Budgeting money, time, and energy are best learned through situations that challenges a person. I think that living alone or even with 1 or 2 others, will push me to be more independent. For example, I only learned to be smart in buying groceries when I volunteered as a missionary and lived with one other person.
+
+Another reason is that the distance can improve physical health. Normally, I don&#x27;t like running. However, if there is a place that offers fresh air and new sights? I will be motivated to jog and take long walks every day. This allows me to take charge of my body.
+
+Being outside the campus, expands social circles. All students are busy and occupied. Having different neighbors who are not all students promotes diversity. Having different kinds of neighbors reminds me of being home, thus preventing homesickness and moments of being alone. Another bonus is the joy one can receive through the opportunities to serve others.
+
+Finally, living in an apartment nurtures emotional resilience. I learned to step out of my comfort zone as I live in an apartment. I love my personal time, but what I appreciate most about living in an apartment is that I have the opportunity to practice trusting myself.
+
+To conclude, there are many factors to consider when a college student decides whether to live in the dorms or at home. It is important to consider distance, expense, comfort, structure, security, accessibility and personal interactions. If one takes into consideration each one of these and explores them thoroughly, he/she should be fine with the decision made.</pre></div></details>
+<!-- EXACT_PROMPTS_END -->
+      <div class="inline-note"><b>Calibration, rather than model training:</b> the examples appear in the inference context. They do not update model weights. All three concern residential choices; the prompt tells the model not to reward topic similarity or copy anchor language. There are no Level 1–3 anchor essays in this desktop prompt.</div>
+      <p class="source-note">Verbatim source: <code>HITL/llm_rubric_prompt.py</code>. The sentence about a “final hybrid model” is retained because it is in the actual prompt; the current desktop does not implement learned score fusion. The anchor essays are prompt artifacts, not newly scored student examples.</p>
+      <div id="copy-status" class="sr-only" role="status" aria-live="polite"></div>
+    </section>
+
+    <section class="observed-section" id="inference" aria-labelledby="inference-title">
+      <div class="section-label">07 / INFERENCE CONTRACT</div><h2 id="inference-title">From a chat request<br>to structured evidence.</h2>
+      <p class="section-intro">The scorer calls Ollama’s local <code>/api/chat</code> endpoint using Python <code>urllib</code>. This is prompted assessment with a pretrained model; the app does not fine-tune Llama’s weights.</p>
+      <div class="split-reference"><div><h3>Request configuration</h3><dl class="definition-list"><div><dt>Default model</dt><dd><code>llama3:8b</code></dd></div><div><dt>Messages</dt><dd>One system + one assembled user message</dd></div><div><dt>Temperature</dt><dd><code>0.0</code></dd></div><div><dt>Output format</dt><dd><code>"json"</code></dd></div><div><dt>Streaming</dt><dd><code>false</code></dd></div><div><dt>Per-essay deadline</dt><dd>600 seconds by default, shared across retries</dd></div></dl></div><div><h3>Required response keys</h3><pre class="code-block" tabindex="0">essay_id
+organization
+paragraph_development
+supporting_detail
+abstract_elaboration
+prompt_control
+comprehensibility
+grammar_meaning_impact
+llm_recommended_score
+justification</pre></div></div>
+      <h3 class="subheading">What the response handler enforces</h3><p>The parser accepts JSON objects and can recover an object surrounded by extra text. It then rounds scores with <code>floor(value + 0.5)</code> and clamps them to 1–6. Missing or ordinary nonnumeric score values fall back to 1. It does <b>not enforce a complete required-key/type schema</b>, so valid JSON can still produce an incomplete or misleading assessment.</p>
+      <p>There are two retry budgets: up to two retries for invalid JSON and up to two recoveries for supported runtime interruptions. All retries share the original deadline. Missing-model or missing-endpoint errors such as HTTP 404 fail directly.</p>
+      <div class="inline-note"><b>Reproducibility boundary:</b> normal essay requests do not explicitly set a seed, context length, or output-token limit. Temperature zero does not guarantee identical output across machines or runtime/model versions. The full rubric, anchors, and essay must fit the effective model context.</div>
+      <p class="source-note">Source: <code>call_ollama_chat()</code>, <code>extract_json_object()</code>, <code>clamp_int_score()</code>, and <code>normalize_llm_result()</code> in <code>HITL/hybrid_llm_aes.py</code>.</p>
+    </section>
+
+    <section class="observed-section" id="human-review" aria-labelledby="human-title">
+      <div class="section-label">08 / HUMAN REVIEW</div><h2 id="human-title">The recommendation<br>is the start of a review.</h2>
+      <p class="section-intro">The rater can inspect the full essay, five displayed rubric traits, model justification, and five writing indicators. Previous/Next, an essay selector, and Next Pending support review across the workbook.</p>
+      <div class="review-steps"><article><span class="step-tag">INITIAL STATE</span><h3>Pending</h3><p>The human score is blank. Running the model does not finalize an essay.</p></article><article><span class="step-tag">HUMAN ACTION</span><h3>Accept or override</h3><p>Accept System Decision saves the model grade. Selecting a different grade lets the rater override it.</p></article><article><span class="step-tag">SAVED RESULT</span><h3>Finalized</h3><p>Saving records the final grade, derived placement, action, notes, and UTC timestamp.</p></article></div>
+      <div class="placement-strip" aria-label="Final score to placement mapping"><div><b>1–3</b><span>Pre-EIL</span></div><div><b>4</b><span>EIL 1</span></div><div><b>5</b><span>EIL 2</span></div><div><b>6</b><span>Test Out</span></div></div>
+      <p>The backend validates whole-number human grades from 1 through 6 and independently derives placement. The current UI’s notes are read-only and automatically describe a score difference; the decision API can receive <code>Reason_Notes</code>. Saving an override does not retrain the model or change the anchors.</p>
+      <details class="reference-detail"><summary>Writing-indicator thresholds and mismatch flags</summary><div class="detail-content">
+        <p>These are application display heuristics. They are not calibrated confidence estimates, placement cutoffs, or another scoring model.</p>
+        <div class="table-wrap"><table><caption>Ranks assigned to available writing indicators</caption><thead><tr><th>Measure</th><th>Low · rank 1</th><th>Developing · rank 2</th><th>Strong · rank 3</th></tr></thead><tbody><tr><th>Word count</th><td>&lt;150</td><td>150 to &lt;300</td><td>≥300</td></tr><tr><th>Sentence count</th><td>&lt;8</td><td>8 to &lt;15</td><td>≥15</td></tr><tr><th>Grammar matches / 100</th><td>&gt;7 · Many Errors</td><td>&gt;3 to 7 · Some Errors</td><td>≤3 · Clean</td></tr><tr><th>MTLD</th><td>&lt;40</td><td>40 to &lt;70</td><td>≥70</td></tr><tr><th>AWL ratio</th><td>&lt;0.04</td><td>0.04 to &lt;0.08</td><td>≥0.08</td></tr></tbody></table></div>
+        <p>The unweighted average of available ranks becomes low (&lt;1.7), developing (1.7 to &lt;2.6), or strong (≥2.6). The model grade is banded as low (1–3), developing (4), or strong (5–6). A mismatch appears only when the bands differ by at least two ranks: <b>low versus strong</b>.</p><p>Missing indicators are excluded; zero remains a valid measured value. Mismatches direct rater attention and do not change the grade. These five indicator ranks differ from the four-component manual AES formula.</p>
+      </div></details>
+      <p class="source-note">Source: <code>metricBand()</code>, <code>indicatorCompositeBand()</code>, <code>hasSignalMismatch()</code>, and <code>derivedDecision()</code> in <code>HITL/ui/index.html</code>; decision validation in <code>app_backend.py</code>.</p>
+    </section>
+
+    <section class="observed-section" id="data-contract" aria-labelledby="data-title">
+      <div class="section-label">09 / WORKBOOKS &amp; LOCAL API</div><h2 id="data-title">Traceable rows,<br>from input to saved judgment.</h2>
+      <p class="section-intro">The output is a newly generated workbook with one <code>Completed_Scores</code> sheet. Original row fields are carried forward, with generated families appended. Original workbook layouts, extra sheets, and formulas are not cloned.</p>
+      <div class="table-wrap"><table><caption>Output families and key aliases</caption><thead><tr><th>Family</th><th>Examples</th><th>Meaning</th></tr></thead><tbody>
+        <tr><th>Original input</th><td>Selected ID, topic, essay, and other source columns</td><td>Source row data; selected sheet uses cached formula values (<code>data_only=True</code>).</td></tr>
+        <tr><th>Measured evidence</th><td><code>aes_score</code>, <code>aes_mtld</code>, <code>aes_awl_ratio</code>, other <code>aes_*</code></td><td>Manual heuristic and linguistic measurements.</td></tr>
+        <tr><th>LLM assessment</th><td><code>llm_organization</code>, <code>llm_recommended_score</code>, <code>llm_justification</code></td><td>Seven traits, generated recommendation, and explanation.</td></tr>
+        <tr><th>Reviewer aliases</th><td><code>Essay_ID</code>, <code>Essay_Text</code>, <code>LLM_Prompt_Fulfillment</code>, <code>Word_Count</code>, <code>AWL_Ratio</code></td><td>UI-friendly aliases; prompt fulfillment maps to <code>llm_prompt_control</code>.</td></tr>
+        <tr><th>Human decision</th><td><code>Rater_Final_Score</code>, <code>Rater_Final_Placement</code>, <code>Rater_Action</code>, <code>Decision_Status</code>, <code>Reason_Notes</code>, <code>Decision_Updated_At</code></td><td>Latest saved rater decision, distinct from the system recommendation.</td></tr>
+      </tbody></table></div>
+      <details class="reference-detail"><summary>Local endpoint reference</summary><div class="detail-content"><p>These endpoints belong to the installed desktop app’s loopback backend. This explanatory website does not connect to or run them.</p><div class="table-wrap"><table><caption>HTTP bridge routes</caption><thead><tr><th>Method &amp; route</th><th>Purpose</th></tr></thead><tbody>
+        <tr><th><code>GET /health</code></th><td>Backend availability and app version.</td></tr><tr><th><code>GET /preflight</code></th><td>Runtime resources, dependencies, paths, and model availability.</td></tr><tr><th><code>POST /inference-check</code></th><td>Short generation probe; rejected during active workbook processing.</td></tr><tr><th><code>POST /jobs</code></th><td>Upload an XLSX file or submit a local path as JSON.</td></tr><tr><th><code>POST /sample-job</code></th><td>Process one essay from the packaged sample.</td></tr><tr><th><code>GET /jobs/&lt;id&gt;</code></th><td>Job status, progress, or error.</td></tr><tr><th><code>GET /jobs/&lt;id&gt;/result</code></th><td>Completed columns and records.</td></tr><tr><th><code>GET /jobs/&lt;id&gt;/download</code></th><td>Download the generated workbook.</td></tr><tr><th><code>POST /review-workbook</code></th><td>Load completed scores for review without rescoring.</td></tr><tr><th><code>POST /jobs/&lt;id&gt;/decision</code></th><td>Save a human decision at a zero-based row index.</td></tr><tr><th><code>POST /shutdown</code></th><td>Stop the local server and its owned runtime.</td></tr>
+      </tbody></table></div></div></details>
+      <div class="inline-note"><b>Persistence boundary:</b> jobs live in memory; the generated XLSX file is the durable result. Reopening a completed workbook creates a new review job. Scoring writes the workbook after the whole job succeeds, with no per-essay disk checkpoint or resume.</div>
+      <p>Job states (<code>queued</code>, <code>running</code>, <code>completed</code>, <code>failed</code>) describe processing. Decision states (<code>Pending</code>, <code>Review</code>, <code>Finalized</code>) describe an essay’s human review. Generated keys can overwrite same-named source columns.</p>
+      <p class="source-note">Source: <code>HITL/hitl_processor.py</code>, <code>app_backend.py</code>, and <code>local_api_server.py</code>.</p>
+    </section>
+
+    <section class="observed-section" id="runtime" aria-labelledby="runtime-title">
+      <div class="section-label">10 / OFFLINE DESKTOP RUNTIME</div><h2 id="runtime-title">Local by design.<br>Prepared before use.</h2>
+      <p class="section-intro">In the default desktop configuration, both the API and model inference run on the same computer. The renderer has no external scripts or fonts. Offline scoring requires the model and language resources to be installed or bundled beforehand.</p>
+      <div class="split-reference"><div><h3>Startup &amp; process ownership</h3><p>Electron prefers API port 8765, falls back to an available port, and selects a free private Ollama port. It provisions bundled models, starts the frozen Python sidecar when available, and waits for <code>/health</code> before opening the dashboard.</p><p>The backend owns its managed Ollama instance and can recover supported interruptions. An explicit <code>HITL_OLLAMA_URL</code> selects an external endpoint that the ownership logic does not stop or restart.</p></div><div><h3>Writable app-data layout</h3><pre class="code-block" tabindex="0">Electron userData/
+├── runtime/
+│   ├── uploads/
+│   └── outputs/
+├── models/ollama/
+└── logs/hitl-backend.log</pre><p>The installed app keeps writable data separate from packaged application files.</p></div></div>
+      <h3 class="subheading">Availability is different from assessment validity</h3><p><code>/health</code> establishes that the backend responds. Preflight checks local resources, packages, Java, model availability, writable paths, and disk space. <b>Test Scoring</b> runs a tiny generation probe with a 120-second timeout and a 32-token output budget; it does not evaluate essay-scoring accuracy.</p>
+      <details class="reference-detail"><summary>The diagnostic probe’s exact prompts</summary><div class="detail-content"><p>The setup panel uses a separate pair of messages for <code>POST /inference-check</code>. These test generation availability, not the rubric.</p><pre class="code-block" tabindex="0">System: Return a JSON object only.
+User: Reply with {"ok": true}.</pre><p class="source-note">Source: <code>HITL/local_api_server.py</code>, <code>do_POST()</code>, <code>/inference-check</code> route.</p></div></details>
+      <p>For distribution, PyInstaller bundles the Python backend and available NLP resources. Java, Ollama, and model assets are packaged separately with the application. Incomplete LanguageTool cache data can require a first-use download. Target-platform native components must match the release operating system and architecture.</p>
+      <p class="source-note">Source: <code>desktop/main.cjs</code>, <code>preflight.py</code>, <code>local_api_server.py</code>, and <code>desktop/scripts/build-python-sidecar.cjs</code>. This site documents source behavior; it does not certify every packaged platform build.</p>
+    </section>
+
+    <section class="observed-section" id="limitations" aria-labelledby="limits-title">
+      <div class="section-label">11 / INTERPRETATION &amp; LIMITS</div><h2 id="limits-title">What an informed reader<br>should keep in view.</h2>
+      <p class="section-intro">The app makes linguistic evidence and model judgments inspectable. Their presence alone does not establish placement validity, fairness, or rater reliability.</p>
+      <div class="limitations-grid">
+        <article><h3>Construct coverage</h3><p>Length, rarity, connective counts, and parser features are proxies. They cannot by themselves establish argument quality, rhetorical appropriateness, or communicative success.</p></article>
+        <article><h3>Prompt &amp; anchor dependence</h3><p>Only Levels 4–6 have calibration essays. A short topic label supplies less task information than the full writing prompt. Anchor coverage and prompt wording can influence judgments.</p></article>
+        <article><h3>Model reliability</h3><p>Context limits, generated inconsistencies, bias, and essay-embedded instructions need evaluation. A fluent justification is generated assessment text, not a guarantee of correctness or a view of internal reasoning.</p></article>
+        <article><h3>Validation needed</h3><p>This guide makes no accuracy claim for the current desktop release. Establish human–human agreement, evaluate independent prompt-diverse data, and test repeated scoring and subgroup behavior before making stronger claims.</p></article>
+        <article><h3>Human review records</h3><p>The app stores the latest decision in the workbook. This path has no authenticated rater identity or append-only revision history. Human overrides do not trigger automatic learning.</p></article>
+        <article><h3>Data &amp; execution boundaries</h3><p>Default scoring is local, but the API has no application authentication and workbook files are not encrypted by this implementation. A late scoring failure can prevent output creation for the entire workbook.</p></article>
+      </div>
+      <div class="closing-statement"><span class="step-tag">THE ROLE OF THE HUMAN</span><p>Use the measurements to ask better questions.<br>Use the rubric to inspect the recommendation.<br><em>Use professional judgment to decide.</em></p></div>
+    </section>
+
+    <section class="observed-section sources-section" id="sources" aria-labelledby="sources-title">
+      <div class="section-label">12 / SOURCES &amp; PROVENANCE</div><h2 id="sources-title">Grounded in the desktop source.</h2>
+      <p>The implementation was reviewed on <b>November 6, 2026</b>, with desktop package version <b data-source-version>0.1.4</b>. Exact rubric prompts are generated from Python constants; the explanatory prose is manually written from the app’s code. No student workbook rows, identifiers, or new essay examples are published here.</p>
+      <p>Source links open the repository’s <code>main</code> branch and may change. This guide reflects the local workspace at review time, including existing edits. The downloadable manifest records the base commit, full SHA-256 file hashes, and which files differed from that commit. The technical reference supplies context; executable source takes precedence when they differ.</p>
+      <div class="section-actions"><a class="button secondary" href="assets/source-manifest.json" download>Download source manifest <span aria-hidden="true">↓</span></a><a class="text-link" href="https://github.com/EPHRAIMTEODORO/Rule-Based-AES" target="_blank" rel="noopener noreferrer">Repository <span aria-hidden="true">↗</span></a></div>
+      <div class="table-wrap source-table"><table><caption>Reviewed inputs · SHA-256 abbreviated to 12 characters</caption><thead><tr><th scope="col">Source file</th><th scope="col">Snapshot status</th><th scope="col">Hash</th></tr></thead><tbody>
+      <!-- SOURCE_ROWS_START -->
+<tr><th scope="row"><a href="https://github.com/EPHRAIMTEODORO/Rule-Based-AES/blob/main/HITL/desktop/main.cjs" target="_blank" rel="noopener noreferrer">HITL/desktop/main.cjs</a></th><td>Matches base commit</td><td><code title="4f7560392d5edd250f80b75788f0e959500484231e6baf53273b1cd1b4065778">4f7560392d5e</code></td></tr>
+<tr><th scope="row"><a href="https://github.com/EPHRAIMTEODORO/Rule-Based-AES/blob/main/HITL/desktop/preload.cjs" target="_blank" rel="noopener noreferrer">HITL/desktop/preload.cjs</a></th><td>Matches base commit</td><td><code title="bd6b3ed5e341c0efaeff5dee8e771258e1351991b436357fb30c1959909fec89">bd6b3ed5e341</code></td></tr>
+<tr><th scope="row"><a href="https://github.com/EPHRAIMTEODORO/Rule-Based-AES/blob/main/HITL/desktop/package.json" target="_blank" rel="noopener noreferrer">HITL/desktop/package.json</a></th><td>Workspace edits</td><td><code title="0d546273f3ec59e6dde16a1d75c785b22e64a9e9619081796334122e5e3e6ac4">0d546273f3ec</code></td></tr>
+<tr><th scope="row"><a href="https://github.com/EPHRAIMTEODORO/Rule-Based-AES/blob/main/HITL/ui/index.html" target="_blank" rel="noopener noreferrer">HITL/ui/index.html</a></th><td>Workspace edits</td><td><code title="487f3028be99bc80ad892743d8b636a766d8f46db54bd8fd1c84a66e0e372dfb">487f3028be99</code></td></tr>
+<tr><th scope="row"><a href="https://github.com/EPHRAIMTEODORO/Rule-Based-AES/blob/main/HITL/local_api_server.py" target="_blank" rel="noopener noreferrer">HITL/local_api_server.py</a></th><td>Matches base commit</td><td><code title="884d2a6387e554d1068ba259e6f64051ad2978fc40b19c04520f8e075b2e0bfa">884d2a6387e5</code></td></tr>
+<tr><th scope="row"><a href="https://github.com/EPHRAIMTEODORO/Rule-Based-AES/blob/main/HITL/app_backend.py" target="_blank" rel="noopener noreferrer">HITL/app_backend.py</a></th><td>Matches base commit</td><td><code title="51ed9cb92b105293f5c1a022ad3d1905e3dd385e92cf2bf982125d845aaffb50">51ed9cb92b10</code></td></tr>
+<tr><th scope="row"><a href="https://github.com/EPHRAIMTEODORO/Rule-Based-AES/blob/main/HITL/hitl_processor.py" target="_blank" rel="noopener noreferrer">HITL/hitl_processor.py</a></th><td>Matches base commit</td><td><code title="d4aeaf66f5a551e03693205646f3d01a4a04a74151a1eb55db01f64f6db859cf">d4aeaf66f5a5</code></td></tr>
+<tr><th scope="row"><a href="https://github.com/EPHRAIMTEODORO/Rule-Based-AES/blob/main/HITL/hybrid_llm_aes.py" target="_blank" rel="noopener noreferrer">HITL/hybrid_llm_aes.py</a></th><td>Matches base commit</td><td><code title="b91df7ac3c90f3b8ff971b5d49e7c155e5d473dad49c33d4f040c9c6638a7bbc">b91df7ac3c90</code></td></tr>
+<tr><th scope="row"><a href="https://github.com/EPHRAIMTEODORO/Rule-Based-AES/blob/main/HITL/llm_rubric_prompt.py" target="_blank" rel="noopener noreferrer">HITL/llm_rubric_prompt.py</a></th><td>Matches base commit</td><td><code title="69d8ea09384df3366c7587ccd84e45aeddfbfce8f04257333f47b853f633b2a6">69d8ea09384d</code></td></tr>
+<tr><th scope="row"><a href="https://github.com/EPHRAIMTEODORO/Rule-Based-AES/blob/main/aes_feature_extractor.py" target="_blank" rel="noopener noreferrer">aes_feature_extractor.py</a></th><td>Matches base commit</td><td><code title="c2d046044a37955de908384c9779336bbb1853eba89ce358eb3b98d6a9b5893c">c2d046044a37</code></td></tr>
+<tr><th scope="row"><a href="https://github.com/EPHRAIMTEODORO/Rule-Based-AES/blob/main/HITL/preflight.py" target="_blank" rel="noopener noreferrer">HITL/preflight.py</a></th><td>Matches base commit</td><td><code title="ea1645bb18e27e9a5d3baac6b4d3121598776d4ba90e0d18597d3257b80da8a8">ea1645bb18e2</code></td></tr>
+<tr><th scope="row"><a href="https://github.com/EPHRAIMTEODORO/Rule-Based-AES/blob/main/HITL/desktop/scripts/build-python-sidecar.cjs" target="_blank" rel="noopener noreferrer">HITL/desktop/scripts/build-python-sidecar.cjs</a></th><td>Matches base commit</td><td><code title="423013aecdd8a9ebb68e37aef15f4dd4bac5385c787e232fc44c542d61e4f367">423013aecdd8</code></td></tr>
+<tr><th scope="row"><a href="https://github.com/EPHRAIMTEODORO/Rule-Based-AES/blob/main/HITL/desktop/scripts/build-windows-installer.ps1" target="_blank" rel="noopener noreferrer">HITL/desktop/scripts/build-windows-installer.ps1</a></th><td>Workspace edits</td><td><code title="c1c769aca7965d2e99d21f5a21550366291877bec9f6b5d18f28d07231ac6930">c1c769aca796</code></td></tr>
+<tr><th scope="row"><a href="https://github.com/EPHRAIMTEODORO/Rule-Based-AES/blob/main/HITL/desktop/README.md" target="_blank" rel="noopener noreferrer">HITL/desktop/README.md</a></th><td>Workspace edits</td><td><code title="9036e36962881dfb99f5ac90345faddf8523ceab460e6d41f1192ac5c4d550a5">9036e3696288</code></td></tr>
+<tr><th scope="row"><a href="https://github.com/EPHRAIMTEODORO/Rule-Based-AES/blob/main/docs/TECHNICAL_REFERENCE.md" target="_blank" rel="noopener noreferrer">docs/TECHNICAL_REFERENCE.md</a></th><td>Workspace edits</td><td><code title="7cf5e0c17e2ef45adefcd0dfd7cc722ca8ef8e662316138869147cc7d6470747">7cf5e0c17e2e</code></td></tr>
+<tr><th scope="row"><a href="https://github.com/EPHRAIMTEODORO/Rule-Based-AES/blob/main/data/awl_word_forms.json" target="_blank" rel="noopener noreferrer">data/awl_word_forms.json</a></th><td>Matches base commit</td><td><code title="8f0803899a8a00c5413c93a02593a3787bd1db8aba82a0275b2e3607819adf38">8f0803899a8a</code></td></tr>
+<!-- SOURCE_ROWS_END -->
+      </tbody></table></div>
+      <p class="source-note">This static guide explains the installed desktop app. It does not upload essays, run inference, or connect to the app’s local API. All reading features run in the browser; no external assets or analytics are loaded.</p>
+    </section>
+    <footer><a class="footer-brand" href="#overview">HITL AES <span>Desktop field guide</span></a><div><a href="assets/prompts.txt" download>Prompt reference</a><button type="button" class="text-button" id="print-guide">Print / Save PDF</button><a href="#overview">Back to top ↑</a></div></footer>
+  </main>
+</body>
+</html>
